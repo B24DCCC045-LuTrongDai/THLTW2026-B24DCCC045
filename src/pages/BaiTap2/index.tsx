@@ -11,6 +11,8 @@ export default function TestTable() {
 };
 const onFinishFailed = errorInfo => {
   console.log('Failed:', errorInfo);
+
+const [thamChieuForm] = Form.useForm();
 };
         const showModal = () => {
             setIsModalOpen(true);

@@ -51,11 +51,12 @@ export default [
 		component: './QuanLySanPham',
 	},
 	{
-		path: '/test-table',
-		name: 'TestTable',
+		path: '/bai-tap-2',
+		name: 'BaiTap2',
 		icon: 'AppstoreOutlined',
-		component: './TestTable',
+		component: './BaiTap2',
 	},
+	
 	// DANH MUC HE THONG
 	// {
 	// 	name: 'DanhMuc',
