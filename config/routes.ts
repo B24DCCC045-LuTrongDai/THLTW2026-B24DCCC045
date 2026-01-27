@@ -50,7 +50,12 @@ export default [
 		icon: 'AppstoreOutlined',
 		component: './QuanLySanPham',
 	},
-
+	{
+		path: '/test-table',
+		name: 'TestTable',
+		icon: 'AppstoreOutlined',
+		component: './TestTable',
+	},
 	// DANH MUC HE THONG
 	// {
 	// 	name: 'DanhMuc',
