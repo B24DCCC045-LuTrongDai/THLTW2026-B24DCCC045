@@ -45,16 +45,16 @@ export default [
 		component: './TodoList',
 	},
 	{
-		path: '/quan-ly-san-pham',
-		name: 'QuanLySanPham',
+		path: '/bai-1',
+		name: 'Bai1',
 		icon: 'AppstoreOutlined',
-		component: './QuanLySanPham',
+		component: './Bai1',
 	},
 	{
-		path: '/bai-tap-3',
-		name: 'BaiTap3',
+		path: '/bai-2',
+		name: 'Bai2',
 		icon: 'AppstoreOutlined',
-		component: './BaiTap3',
+		component: './Bai2',
 	},
 	
 	// DANH MUC HE THONG
