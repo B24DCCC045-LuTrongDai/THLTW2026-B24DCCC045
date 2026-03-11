@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tabs, Table, Form, Input, Select, Button, message, InputNumber, Space, Card } from 'antd';
+import { Tabs, Table, Form, Input, Select, Button, message, InputNumber, Space, Card, Popconfirm, Modal } from 'antd';
 import rules from '@/utils/rules';
 
 const { Option } = Select;
@@ -10,11 +10,13 @@ export default function QuanLyThi() {
   const [dsMon, setDsMon] = useState([{ maMon: 'IT01', tenMon: 'Lập trình Web', tinChi: 3 }]);
   const [dsCauHoi, setDsCauHoi] = useState([]);
   const [dsDeThi, setDsDeThi] = useState([]);
+  const [deDangSua, setDeDangSua] = useState(null);
 
   const [formKhoi] = Form.useForm();
   const [formMon] = Form.useForm();
   const [formCauHoi] = Form.useForm();
   const [formDeThi] = Form.useForm();
+  const [formSua] = Form.useForm();
 
   const themKhoi = (gt) => {
     setDsKhoi([...dsKhoi, { id: Date.now(), ...gt }]);
@@ -43,6 +45,26 @@ export default function QuanLyThi() {
     
     setDsDeThi([{ maDe: `DE-${Date.now()}`, maMon: gt.maMon, ds: cauHoiDeThi }, ...dsDeThi]);
     message.success('Tạo đề thành công');
+  };
+
+  const xoaDe = (maDe) => {
+    setDsDeThi(dsDeThi.filter(d => d.maDe !== maDe));
+    message.success('Đã xóa đề thi');
+  };
+
+  const moSuaDe = (d) => {
+    setDeDangSua(d);
+    formSua.setFieldsValue({ maDe: d.maDe });
+  };
+
+  const luuSuaDe = (gt) => {
+    setDsDeThi(dsDeThi.map(d => d.maDe === deDangSua.maDe ? { ...d, maDe: gt.maDe } : d));
+    setDeDangSua(null);
+    message.success('Đã cập nhật mã đề');
+  };
+
+  const xoaCauTrongDe = (maDe, maCau) => {
+    setDsDeThi(dsDeThi.map(d => d.maDe === maDe ? { ...d, ds: d.ds.filter(c => c.maCau !== maCau) } : d));
   };
 
   const cotKhoi = [{ title: 'Khối', dataIndex: 'tenKhoi' }];
@@ -123,14 +145,43 @@ export default function QuanLyThi() {
               </Form.List>
               <Form.Item><Button type="primary" htmlType="submit">Tạo đề thi</Button></Form.Item>
             </Form>
+
             {dsDeThi.map(d => (
-              <Card key={d.maDe} title={`${d.maDe} - Môn: ${d.maMon}`} size="small" style={{ marginTop: 10 }}>
-                <ol>{d.ds.map(c => <li key={c.maCau}><b>[{c.tenKhoi} - {c.mucDo}]</b> {c.noiDung}</li>)}</ol>
+              <Card 
+                key={d.maDe} 
+                title={`${d.maDe} - Môn: ${d.maMon}`} 
+                size="small" 
+                style={{ marginTop: 15, background: '#fafafa' }}
+                extra={
+                  <Space>
+                    <Button size="small" onClick={() => moSuaDe(d)}>Sửa mã đề</Button>
+                    <Popconfirm title="Bạn có chắc chắn muốn xóa đề này?" onConfirm={() => xoaDe(d.maDe)}>
+                      <Button size="small" danger>Xóa đề</Button>
+                    </Popconfirm>
+                  </Space>
+                }
+              >
+                <ol style={{ margin: 0, paddingLeft: 20 }}>
+                  {d.ds.map(c => (
+                    <li key={c.maCau} style={{ marginBottom: 8 }}>
+                      <b>[{c.tenKhoi} - {c.mucDo}]</b> {c.noiDung}
+                      <Button type="link" danger size="small" onClick={() => xoaCauTrongDe(d.maDe, c.maCau)}>Xóa câu này</Button>
+                    </li>
+                  ))}
+                </ol>
               </Card>
             ))}
           </Card>
         </TabPane>
       </Tabs>
+
+      <Modal title="Chỉnh sửa mã đề thi" visible={!!deDangSua} onCancel={() => setDeDangSua(null)} onOk={() => formSua.submit()}>
+        <Form form={formSua} onFinish={luuSuaDe}>
+          <Form.Item name="maDe" label="Mã đề" rules={rules.required}>
+            <Input placeholder="Nhập mã đề mới" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
