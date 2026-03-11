@@ -33,18 +33,6 @@ export default [
 		hideInMenu: true,
 	},
 	{
-		path: '/random-user',
-		name: 'RandomUser',
-		component: './RandomUser',
-		icon: 'ArrowsAltOutlined',
-	},
-	{
-		path: '/todo-list',
-		name: 'TodoList',
-		icon: 'OrderedListOutlined',
-		component: './TodoList',
-	},
-	{
 		path: '/bai-1',
 		name: 'Bai1',
 		icon: 'AppstoreOutlined',
