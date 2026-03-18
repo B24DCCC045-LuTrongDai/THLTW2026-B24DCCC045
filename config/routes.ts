@@ -38,12 +38,6 @@ export default [
 		icon: 'AppstoreOutlined',
 		component: './Bai1',
 	},
-	{
-		path: '/bai-2',
-		name: 'Bai2',
-		icon: 'AppstoreOutlined',
-		component: './Bai2',
-	},
 	
 	// DANH MUC HE THONG
 	// {
