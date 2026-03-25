@@ -1,290 +1,278 @@
-import React, { useState } from 'react';
-import { Tabs, Table, Form, Input, Button, Select, DatePicker, TimePicker, message, Rate, Row, Col, Card, Modal } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Tabs, Form, Input, Button, Table, Select, DatePicker, InputNumber, message, Card, Descriptions, Space } from 'antd';
 import moment from 'moment';
 import rules from '@/utils/rules';
 
+const { TabPane } = Tabs;
+const { Option } = Select;
+
 const App = () => {
-	const [employees, setEmployees] = useState([]);
-	const [services, setServices] = useState([]);
-	const [appointments, setAppointments] = useState([]);
-	const [reviews, setReviews] = useState([]);
+  const [books, setBooks] = useState([]);
+  const [decisions, setDecisions] = useState([]);
+  const [fields, setFields] = useState([]);
+  const [diplomas, setDiplomas] = useState([]);
+  
+  const [bookForm] = Form.useForm();
+  const [decisionForm] = Form.useForm();
+  const [fieldForm] = Form.useForm();
+  const [diplomaForm] = Form.useForm();
+  const [searchForm] = Form.useForm();
 
-	const [formEmp] = Form.useForm();
-	const [formSvc] = Form.useForm();
-	const [formAppt] = Form.useForm();
-	const [formEditEmp] = Form.useForm();
-	const [formEditSvc] = Form.useForm();
+  const [searchResults, setSearchResults] = useState([]);
+  const selectedDecisionId = Form.useWatch('decisionId', diplomaForm);
 
-	const [editingEmp, setEditingEmp] = useState(null);
-	const [editingSvc, setEditingSvc] = useState(null);
+  useEffect(() => {
+    if (selectedDecisionId) {
+      const decision = decisions.find(d => d.id === selectedDecisionId);
+      if (decision) {
+        const book = books.find(b => b.id === decision.bookId);
+        if (book) {
+          diplomaForm.setFieldsValue({ entryNumber: book.currentEntry });
+        }
+      }
+    }
+  }, [selectedDecisionId, decisions, books, diplomaForm]);
 
-	const handleAddEmployee = (val) => {
-		setEmployees([...employees, { ...val, id: Date.now() }]);
-		formEmp.resetFields();
-	};
+  const onAddBook = (values) => {
+    setBooks([...books, { id: Date.now(), year: values.year, currentEntry: 1 }]);
+    bookForm.resetFields();
+  };
 
-	const handleEditEmployee = (val) => {
-		setEmployees(employees.map(e => e.id === editingEmp.id ? { ...e, ...val } : e));
-		setEditingEmp(null);
-	};
+  const onAddDecision = (values) => {
+    setDecisions([...decisions, { 
+      id: Date.now(), 
+      ...values, 
+      date: values.date.format('YYYY-MM-DD'),
+      lookupCount: 0 
+    }]);
+    decisionForm.resetFields();
+  };
 
-	const handleDeleteEmployee = (id) => setEmployees(employees.filter((e) => e.id !== id));
+  const onAddField = (values) => {
+    setFields([...fields, { id: Date.now(), ...values }]);
+    fieldForm.resetFields();
+  };
 
-	const handleAddService = (val) => {
-		setServices([...services, { ...val, id: Date.now() }]);
-		formSvc.resetFields();
-	};
+  const onDeleteField = (id) => {
+    setFields(fields.filter(f => f.id !== id));
+  };
 
-	const handleEditService = (val) => {
-		setServices(services.map(s => s.id === editingSvc.id ? { ...s, ...val } : s));
-		setEditingSvc(null);
-	};
+  const onAddDiploma = (values) => {
+    const decision = decisions.find(d => d.id === values.decisionId);
+    const bookIndex = books.findIndex(b => b.id === decision.bookId);
+    
+    const entryNumber = books[bookIndex].currentEntry;
+    const newBooks = [...books];
+    newBooks[bookIndex].currentEntry += 1;
+    setBooks(newBooks);
 
-	const handleDeleteService = (id) => setServices(services.filter((s) => s.id !== id));
+    const formattedValues = {
+      ...values,
+      dob: values.dob.format('YYYY-MM-DD'),
+      customData: values.customData ? Object.entries(values.customData).reduce((acc, [k, v]) => {
+        acc[k] = moment.isMoment(v) ? v.format('YYYY-MM-DD') : v;
+        return acc;
+      }, {}) : {}
+    };
 
-	const handleBookAppointment = (val) => {
-		const emp = employees.find((e) => e.id === val.empId);
-		const dateStr = val.date.format('YYYY-MM-DD');
-		const monthStr = val.date.format('YYYY-MM');
-		const timeStr = val.time.format('HH:mm');
+    setDiplomas([...diplomas, { id: Date.now(), ...formattedValues, entryNumber }]);
+    diplomaForm.resetFields();
+  };
 
-		const dailyCount = appointments.filter((a) => a.empId === val.empId && a.dateStr === dateStr && a.status !== 'Hủy').length;
-		if (dailyCount >= Number(emp.max)) {
-			message.error('Nhân viên đã đạt giới hạn khách trong ngày!');
-			return;
-		}
+  const onSearch = (values) => {
+    const activeParams = Object.keys(values).filter(key => values[key]);
+    if (activeParams.length < 2) {
+      message.error('Vui lòng nhập ít nhất 2 tham số tìm kiếm');
+      return;
+    }
 
-		const isOverlap = appointments.some(
-			(a) => a.empId === val.empId && a.dateStr === dateStr && a.timeStr === timeStr && a.status !== 'Hủy',
-		);
-		if (isOverlap) {
-			message.error('Lịch hẹn bị trùng!');
-			return;
-		}
+    const results = diplomas.filter(dip => {
+      let match = true;
+      if (values.diplomaNumber && dip.diplomaNumber !== values.diplomaNumber) match = false;
+      if (values.entryNumber && dip.entryNumber !== Number(values.entryNumber)) match = false;
+      if (values.studentId && dip.studentId !== values.studentId) match = false;
+      if (values.name && !dip.name.toLowerCase().includes(values.name.toLowerCase())) match = false;
+      if (values.dob && dip.dob !== values.dob.format('YYYY-MM-DD')) match = false;
+      return match;
+    });
 
-		setAppointments([...appointments, { ...val, id: Date.now(), dateStr, monthStr, timeStr, status: 'Chờ duyệt' }]);
-		formAppt.resetFields();
-		message.success('Đặt lịch thành công!');
-	};
+    if (results.length > 0) {
+      const updatedDecisions = [...decisions];
+      results.forEach(res => {
+        const dIndex = updatedDecisions.findIndex(d => d.id === res.decisionId);
+        if (dIndex > -1) {
+          updatedDecisions[dIndex].lookupCount += 1;
+        }
+      });
+      setDecisions(updatedDecisions);
+    }
 
-	const updateApptStatus = (id, status) => setAppointments(appointments.map((a) => (a.id === id ? { ...a, status } : a)));
+    setSearchResults(results);
+  };
 
-	const handleAddReview = (apptId, rating, comment) => setReviews([...reviews, { id: Date.now(), apptId, rating, comment, reply: '' }]);
+  return (
+    <div style={{ padding: 24 }}>
+      <Tabs defaultActiveKey="1">
+        <TabPane tab="Quản lý sổ văn bằng" key="1">
+          <Form form={bookForm} onFinish={onAddBook} layout="inline" style={{ marginBottom: 16 }}>
+            <Form.Item name="year" label="Năm" rules={[rules.required[0], rules.sotaikhoan[0]]}>
+              <Input />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit">Thêm sổ mới</Button>
+            </Form.Item>
+          </Form>
+          <Table 
+            dataSource={books} 
+            rowKey="id" 
+            columns={[
+              { title: 'Năm', dataIndex: 'year' },
+              { title: 'Số vào sổ hiện tại', dataIndex: 'currentEntry' }
+            ]} 
+          />
+        </TabPane>
 
-	const handleReplyReview = (id, reply) => setReviews(reviews.map((r) => (r.id === id ? { ...r, reply } : r)));
+        <TabPane tab="Quyết định tốt nghiệp" key="2">
+          <Form form={decisionForm} onFinish={onAddDecision} layout="vertical">
+            <Form.Item name="decisionNumber" label="Số QĐ" rules={rules.required}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="date" label="Ngày ban hành" rules={rules.required}>
+              <DatePicker format="DD/MM/YYYY" />
+            </Form.Item>
+            <Form.Item name="summary" label="Trích yếu" rules={rules.required}>
+              <Input.TextArea />
+            </Form.Item>
+            <Form.Item name="bookId" label="Sổ văn bằng" rules={rules.required}>
+              <Select>
+                {books.map(b => <Option key={b.id} value={b.id}>{b.year}</Option>)}
+              </Select>
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit">Thêm quyết định</Button>
+            </Form.Item>
+          </Form>
+          <Table 
+            dataSource={decisions} 
+            rowKey="id" 
+            columns={[
+              { title: 'Số QĐ', dataIndex: 'decisionNumber' },
+              { title: 'Ngày ban hành', dataIndex: 'date' },
+              { title: 'Trích yếu', dataIndex: 'summary' },
+              { title: 'Sổ năm', render: (_, r) => books.find(b => b.id === r.bookId)?.year },
+              { title: 'Lượt tra cứu', dataIndex: 'lookupCount' }
+            ]} 
+          />
+        </TabPane>
 
-	const completedAppointments = appointments.filter((a) => a.status === 'Hoàn thành');
+        <TabPane tab="Cấu hình biểu mẫu" key="3">
+          <Form form={fieldForm} onFinish={onAddField} layout="inline" style={{ marginBottom: 16 }}>
+            <Form.Item name="name" label="Tên trường" rules={rules.required}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="type" label="Kiểu dữ liệu" rules={rules.required}>
+              <Select style={{ width: 120 }}>
+                <Option value="String">String</Option>
+                <Option value="Number">Number</Option>
+                <Option value="Date">Date</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit">Thêm trường</Button>
+            </Form.Item>
+          </Form>
+          <Table 
+            dataSource={fields} 
+            rowKey="id" 
+            columns={[
+              { title: 'Tên trường', dataIndex: 'name' },
+              { title: 'Kiểu dữ liệu', dataIndex: 'type' },
+              { title: 'Thao tác', render: (_, r) => <Button danger onClick={() => onDeleteField(r.id)}>Xóa</Button> }
+            ]} 
+          />
+        </TabPane>
 
-	const getStats = () => {
-		const byDate = {};
-		const byMonth = {};
-		const revByEmp = {};
-		const revBySvc = {};
+        <TabPane tab="Thông tin văn bằng" key="4">
+          <Form form={diplomaForm} onFinish={onAddDiploma} layout="vertical">
+            <Form.Item name="decisionId" label="Quyết định tốt nghiệp" rules={rules.required}>
+              <Select>
+                {decisions.map(d => <Option key={d.id} value={d.id}>{d.decisionNumber} - {d.summary}</Option>)}
+              </Select>
+            </Form.Item>
+            <Form.Item name="entryNumber" label="Số vào sổ">
+              <Input disabled />
+            </Form.Item>
+            <Form.Item name="diplomaNumber" label="Số hiệu văn bằng" rules={rules.required}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="studentId" label="Mã sinh viên" rules={rules.required}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="name" label="Họ tên" rules={rules.ten}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="dob" label="Ngày sinh" rules={rules.required}>
+              <DatePicker format="DD/MM/YYYY" />
+            </Form.Item>
 
-		appointments.forEach(a => {
-			byDate[a.dateStr] = (byDate[a.dateStr] || 0) + 1;
-			byMonth[a.monthStr] = (byMonth[a.monthStr] || 0) + 1;
-		});
+            {fields.map(f => (
+              <Form.Item key={f.id} name={['customData', f.id]} label={f.name} rules={rules.required}>
+                {f.type === 'String' && <Input />}
+                {f.type === 'Number' && <InputNumber style={{ width: '100%' }} />}
+                {f.type === 'Date' && <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />}
+              </Form.Item>
+            ))}
 
-		completedAppointments.forEach(a => {
-			const svc = services.find(s => s.id === a.svcId);
-			const price = svc ? Number(svc.price) : 0;
-			const empName = employees.find(e => e.id === a.empId)?.name || 'N/A';
-			const svcName = svc?.name || 'N/A';
+            <Form.Item>
+              <Button type="primary" htmlType="submit">Thêm văn bằng</Button>
+            </Form.Item>
+          </Form>
+        </TabPane>
 
-			revByEmp[empName] = (revByEmp[empName] || 0) + price;
-			revBySvc[svcName] = (revBySvc[svcName] || 0) + price;
-		});
+        <TabPane tab="Tra cứu văn bằng" key="5">
+          <Form form={searchForm} onFinish={onSearch} layout="vertical">
+            <Space size="middle" wrap>
+              <Form.Item name="diplomaNumber" label="Số hiệu văn bằng"><Input /></Form.Item>
+              <Form.Item name="entryNumber" label="Số vào sổ"><InputNumber style={{ width: '100%' }}/></Form.Item>
+              <Form.Item name="studentId" label="Mã sinh viên"><Input /></Form.Item>
+              <Form.Item name="name" label="Họ tên"><Input /></Form.Item>
+              <Form.Item name="dob" label="Ngày sinh"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }}/></Form.Item>
+            </Space>
+            <Form.Item>
+              <Button type="primary" htmlType="submit">Tra cứu</Button>
+            </Form.Item>
+          </Form>
 
-		return { byDate, byMonth, revByEmp, revBySvc };
-	};
-
-	const stats = getStats();
-
-	const empColumns = [
-		{ title: 'Tên nhân viên', dataIndex: 'name' },
-		{ title: 'Giới hạn khách/ngày', dataIndex: 'max' },
-		{ title: 'Lịch làm việc', dataIndex: 'schedule' },
-		{
-			title: 'Đánh giá TB',
-			render: (_, r) => {
-				const empAppts = appointments.filter((a) => a.empId === r.id).map((a) => a.id);
-				const empReviews = reviews.filter((rev) => empAppts.includes(rev.apptId));
-				const avg = empReviews.length ? empReviews.reduce((sum, rev) => sum + rev.rating, 0) / empReviews.length : 0;
-				return <Rate disabled value={avg} />;
-			},
-		},
-		{
-			title: 'Hành động',
-			render: (_, r) => (
-				<>
-					<Button onClick={() => { setEditingEmp(r); formEditEmp.setFieldsValue(r); }} style={{ marginRight: 8 }}>Sửa</Button>
-					<Button danger onClick={() => handleDeleteEmployee(r.id)}>Xóa</Button>
-				</>
-			),
-		},
-	];
-
-	const svcColumns = [
-		{ title: 'Tên dịch vụ', dataIndex: 'name' },
-		{ title: 'Giá', dataIndex: 'price' },
-		{ title: 'Thời gian (phút)', dataIndex: 'duration' },
-		{
-			title: 'Hành động',
-			render: (_, r) => (
-				<>
-					<Button onClick={() => { setEditingSvc(r); formEditSvc.setFieldsValue(r); }} style={{ marginRight: 8 }}>Sửa</Button>
-					<Button danger onClick={() => handleDeleteService(r.id)}>Xóa</Button>
-				</>
-			),
-		},
-	];
-
-	const apptColumns = [
-		{ title: 'Khách hàng', dataIndex: 'customer' },
-		{ title: 'Dịch vụ', render: (_, r) => services.find((s) => s.id === r.svcId)?.name },
-		{ title: 'Nhân viên', render: (_, r) => employees.find((e) => e.id === r.empId)?.name },
-		{ title: 'Ngày', dataIndex: 'dateStr' },
-		{ title: 'Giờ', dataIndex: 'timeStr' },
-		{
-			title: 'Trạng thái',
-			render: (_, r) => (
-				<Select value={r.status} onChange={(v) => updateApptStatus(r.id, v)}>
-					<Select.Option value="Chờ duyệt">Chờ duyệt</Select.Option>
-					<Select.Option value="Xác nhận">Xác nhận</Select.Option>
-					<Select.Option value="Hoàn thành">Hoàn thành</Select.Option>
-					<Select.Option value="Hủy">Hủy</Select.Option>
-				</Select>
-			),
-		},
-	];
-
-	const reviewColumns = [
-		{ title: 'Khách hàng', render: (_, r) => appointments.find((a) => a.id === r.apptId)?.customer },
-		{ title: 'Đánh giá', render: (_, r) => <Rate disabled value={r.rating} /> },
-		{ title: 'Nhận xét', dataIndex: 'comment' },
-		{
-			title: 'Phản hồi NV',
-			render: (_, r) => r.reply ? <span>{r.reply}</span> : <Input.Search enterButton="Gửi" onSearch={(v) => handleReplyReview(r.id, v)} />,
-		},
-	];
-
-	return (
-		<div style={{ padding: 24 }}>
-			<Tabs defaultActiveKey="1">
-				<Tabs.TabPane tab="Nhân viên & Dịch vụ" key="1">
-					<Row gutter={24}>
-						<Col span={12}>
-							<Form form={formEmp} layout="inline" onFinish={handleAddEmployee}>
-								<Form.Item name="name" rules={rules.ten}><Input placeholder="Tên nhân viên" /></Form.Item>
-								<Form.Item name="max" rules={rules.number(100, 1, false)}><Input placeholder="Giới hạn/ngày" /></Form.Item>
-								<Form.Item name="schedule" rules={rules.required}><Input placeholder="Lịch làm việc" /></Form.Item>
-								<Button type="primary" htmlType="submit">Thêm NV</Button>
-							</Form>
-							<Table dataSource={employees} columns={empColumns} rowKey="id" style={{ marginTop: 16 }} />
-						</Col>
-						<Col span={12}>
-							<Form form={formSvc} layout="inline" onFinish={handleAddService}>
-								<Form.Item name="name" rules={rules.required}><Input placeholder="Tên dịch vụ" /></Form.Item>
-								<Form.Item name="price" rules={rules.number(100000000, 0, false)}><Input placeholder="Giá" /></Form.Item>
-								<Form.Item name="duration" rules={rules.number(500, 1, false)}><Input placeholder="Phút" /></Form.Item>
-								<Button type="primary" htmlType="submit">Thêm DV</Button>
-							</Form>
-							<Table dataSource={services} columns={svcColumns} rowKey="id" style={{ marginTop: 16 }} />
-						</Col>
-					</Row>
-				</Tabs.TabPane>
-
-				<Tabs.TabPane tab="Quản lý Lịch hẹn" key="2">
-					<Form form={formAppt} layout="inline" onFinish={handleBookAppointment}>
-						<Form.Item name="customer" rules={rules.ten}><Input placeholder="Tên khách hàng" /></Form.Item>
-						<Form.Item name="svcId" rules={rules.required}>
-							<Select placeholder="Chọn dịch vụ" style={{ width: 150 }}>
-								{services.map((s) => <Select.Option key={s.id} value={s.id}>{s.name}</Select.Option>)}
-							</Select>
-						</Form.Item>
-						<Form.Item name="empId" rules={rules.required}>
-							<Select placeholder="Chọn nhân viên" style={{ width: 150 }}>
-								{employees.map((e) => <Select.Option key={e.id} value={e.id}>{e.name}</Select.Option>)}
-							</Select>
-						</Form.Item>
-						<Form.Item name="date" rules={rules.sauHomNay}><DatePicker placeholder="Ngày" /></Form.Item>
-						<Form.Item name="time" rules={rules.required}><TimePicker format="HH:mm" placeholder="Giờ" /></Form.Item>
-						<Button type="primary" htmlType="submit">Đặt lịch</Button>
-					</Form>
-					<Table dataSource={appointments} columns={apptColumns} rowKey="id" style={{ marginTop: 16 }} />
-				</Tabs.TabPane>
-
-				<Tabs.TabPane tab="Đánh giá" key="3">
-					<h3>Lịch hẹn hoàn thành (chưa đánh giá)</h3>
-					<Table
-						dataSource={completedAppointments.filter((a) => !reviews.some((r) => r.apptId === a.id))}
-						rowKey="id"
-						columns={[
-							{ title: 'Khách', dataIndex: 'customer' },
-							{ title: 'Ngày', dataIndex: 'dateStr' },
-							{
-								title: 'Đánh giá',
-								render: (_, r) => {
-									let rating = 0; let comment = '';
-									return (
-										<div style={{ display: 'flex', gap: 8 }}>
-											<Rate onChange={(v) => rating = v} />
-											<Input placeholder="Nhận xét" onChange={(e) => comment = e.target.value} />
-											<Button onClick={() => handleAddReview(r.id, rating, comment)}>Gửi</Button>
-										</div>
-									);
-								},
-							},
-						]}
-					/>
-					<h3 style={{ marginTop: 24 }}>Danh sách đánh giá</h3>
-					<Table dataSource={reviews} columns={reviewColumns} rowKey="id" />
-				</Tabs.TabPane>
-
-				<Tabs.TabPane tab="Thống kê" key="4">
-					<Row gutter={16}>
-						<Col span={6}>
-							<Card title="Lịch hẹn theo ngày">
-								{Object.entries(stats.byDate).map(([date, count]) => <div key={date}>{date}: {count} lịch</div>)}
-							</Card>
-						</Col>
-						<Col span={6}>
-							<Card title="Lịch hẹn theo tháng">
-								{Object.entries(stats.byMonth).map(([month, count]) => <div key={month}>{month}: {count} lịch</div>)}
-							</Card>
-						</Col>
-						<Col span={6}>
-							<Card title="Doanh thu theo dịch vụ">
-								{Object.entries(stats.revBySvc).map(([svc, rev]) => <div key={svc}>{svc}: {rev.toLocaleString()} đ</div>)}
-							</Card>
-						</Col>
-						<Col span={6}>
-							<Card title="Doanh thu theo nhân viên">
-								{Object.entries(stats.revByEmp).map(([emp, rev]) => <div key={emp}>{emp}: {rev.toLocaleString()} đ</div>)}
-							</Card>
-						</Col>
-					</Row>
-				</Tabs.TabPane>
-			</Tabs>
-
-			<Modal title="Sửa nhân viên" open={!!editingEmp} visible={!!editingEmp} forceRender onCancel={() => setEditingEmp(null)} onOk={() => formEditEmp.submit()}>
-				<Form form={formEditEmp} layout="vertical" onFinish={handleEditEmployee}>
-					<Form.Item name="name" label="Tên" rules={rules.ten}><Input /></Form.Item>
-					<Form.Item name="max" label="Giới hạn/ngày" rules={rules.number(100, 1, false)}><Input /></Form.Item>
-					<Form.Item name="schedule" label="Lịch làm việc" rules={rules.required}><Input /></Form.Item>
-				</Form>
-			</Modal>
-
-			<Modal title="Sửa dịch vụ" open={!!editingSvc} visible={!!editingSvc} forceRender onCancel={() => setEditingSvc(null)} onOk={() => formEditSvc.submit()}>
-				<Form form={formEditSvc} layout="vertical" onFinish={handleEditService}>
-					<Form.Item name="name" label="Tên dịch vụ" rules={rules.required}><Input /></Form.Item>
-					<Form.Item name="price" label="Giá" rules={rules.number(100000000, 0, false)}><Input /></Form.Item>
-					<Form.Item name="duration" label="Thời gian (phút)" rules={rules.number(500, 1, false)}><Input /></Form.Item>
-				</Form>
-			</Modal>
-		</div>
-	);
+          {searchResults.map(dip => {
+            const decision = decisions.find(d => d.id === dip.decisionId);
+            return (
+              <Card key={dip.id} style={{ marginTop: 16 }}>
+                <Descriptions title="Thông tin văn bằng" bordered column={2}>
+                  <Descriptions.Item label="Họ tên">{dip.name}</Descriptions.Item>
+                  <Descriptions.Item label="Mã SV">{dip.studentId}</Descriptions.Item>
+                  <Descriptions.Item label="Ngày sinh">{moment(dip.dob).format('DD/MM/YYYY')}</Descriptions.Item>
+                  <Descriptions.Item label="Số hiệu">{dip.diplomaNumber}</Descriptions.Item>
+                  <Descriptions.Item label="Số vào sổ">{dip.entryNumber}</Descriptions.Item>
+                  {fields.map(f => (
+                    <Descriptions.Item key={f.id} label={f.name}>
+                      {dip.customData[f.id]}
+                    </Descriptions.Item>
+                  ))}
+                </Descriptions>
+                {decision && (
+                  <Descriptions title="Quyết định tốt nghiệp" bordered column={2} style={{ marginTop: 16 }}>
+                    <Descriptions.Item label="Số QĐ">{decision.decisionNumber}</Descriptions.Item>
+                    <Descriptions.Item label="Ngày ban hành">{moment(decision.date).format('DD/MM/YYYY')}</Descriptions.Item>
+                    <Descriptions.Item label="Trích yếu" span={2}>{decision.summary}</Descriptions.Item>
+                  </Descriptions>
+                )}
+              </Card>
+            );
+          })}
+        </TabPane>
+      </Tabs>
+    </div>
+  );
 };
 
 export default App;
