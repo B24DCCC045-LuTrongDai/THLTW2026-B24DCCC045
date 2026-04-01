@@ -1,278 +1,249 @@
-import React, { useState, useEffect } from 'react';
-import { Tabs, Form, Input, Button, Table, Select, DatePicker, InputNumber, message, Card, Descriptions, Space } from 'antd';
+import React, { useState } from 'react';
+import { Table, Button, Modal, Form, Input, Select, DatePicker, Switch, Tabs, Space, Popconfirm, Card, Row, Col, Statistic, message } from 'antd';
+import { Column } from '@ant-design/charts';
 import moment from 'moment';
 import rules from '@/utils/rules';
 
 const { TabPane } = Tabs;
-const { Option } = Select;
 
-const App = () => {
-  const [books, setBooks] = useState([]);
-  const [decisions, setDecisions] = useState([]);
-  const [fields, setFields] = useState([]);
-  const [diplomas, setDiplomas] = useState([]);
-  
-  const [bookForm] = Form.useForm();
-  const [decisionForm] = Form.useForm();
-  const [fieldForm] = Form.useForm();
-  const [diplomaForm] = Form.useForm();
-  const [searchForm] = Form.useForm();
+export default function ClubManagement() {
+  const [clubs, setClubs] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [activeTab, setActiveTab] = useState('1');
 
-  const [searchResults, setSearchResults] = useState([]);
-  const selectedDecisionId = Form.useWatch('decisionId', diplomaForm);
+  const [clubForm] = Form.useForm();
+  const [appForm] = Form.useForm();
+  const [rejectForm] = Form.useForm();
+  const [changeClubForm] = Form.useForm();
 
-  useEffect(() => {
-    if (selectedDecisionId) {
-      const decision = decisions.find(d => d.id === selectedDecisionId);
-      if (decision) {
-        const book = books.find(b => b.id === decision.bookId);
-        if (book) {
-          diplomaForm.setFieldsValue({ entryNumber: book.currentEntry });
-        }
-      }
+  const [isClubModalOpen, setIsClubModalOpen] = useState(false);
+  const [isAppModalOpen, setIsAppModalOpen] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [isChangeClubModalOpen, setIsChangeClubModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+
+  const [editingClub, setEditingClub] = useState(null);
+  const [editingApp, setEditingApp] = useState(null);
+  const [selectedAppKeys, setSelectedAppKeys] = useState([]);
+  const [selectedMemberKeys, setSelectedMemberKeys] = useState([]);
+  const [rejectingIds, setRejectingIds] = useState([]);
+
+  const handleSaveClub = (values) => {
+    if (editingClub) {
+      setClubs(clubs.map(c => c.id === editingClub.id ? { ...c, ...values, date: values.date.format('YYYY-MM-DD') } : c));
+    } else {
+      setClubs([...clubs, { ...values, id: Date.now(), date: values.date.format('YYYY-MM-DD') }]);
     }
-  }, [selectedDecisionId, decisions, books, diplomaForm]);
-
-  const onAddBook = (values) => {
-    setBooks([...books, { id: Date.now(), year: values.year, currentEntry: 1 }]);
-    bookForm.resetFields();
+    setIsClubModalOpen(false);
+    clubForm.resetFields();
   };
 
-  const onAddDecision = (values) => {
-    setDecisions([...decisions, { 
-      id: Date.now(), 
-      ...values, 
-      date: values.date.format('YYYY-MM-DD'),
-      lookupCount: 0 
-    }]);
-    decisionForm.resetFields();
+  const handleDeleteClub = (id) => {
+    setClubs(clubs.filter(c => c.id !== id));
   };
 
-  const onAddField = (values) => {
-    setFields([...fields, { id: Date.now(), ...values }]);
-    fieldForm.resetFields();
-  };
-
-  const onDeleteField = (id) => {
-    setFields(fields.filter(f => f.id !== id));
-  };
-
-  const onAddDiploma = (values) => {
-    const decision = decisions.find(d => d.id === values.decisionId);
-    const bookIndex = books.findIndex(b => b.id === decision.bookId);
-    
-    const entryNumber = books[bookIndex].currentEntry;
-    const newBooks = [...books];
-    newBooks[bookIndex].currentEntry += 1;
-    setBooks(newBooks);
-
-    const formattedValues = {
-      ...values,
-      dob: values.dob.format('YYYY-MM-DD'),
-      customData: values.customData ? Object.entries(values.customData).reduce((acc, [k, v]) => {
-        acc[k] = moment.isMoment(v) ? v.format('YYYY-MM-DD') : v;
-        return acc;
-      }, {}) : {}
-    };
-
-    setDiplomas([...diplomas, { id: Date.now(), ...formattedValues, entryNumber }]);
-    diplomaForm.resetFields();
-  };
-
-  const onSearch = (values) => {
-    const activeParams = Object.keys(values).filter(key => values[key]);
-    if (activeParams.length < 2) {
-      message.error('Vui lòng nhập ít nhất 2 tham số tìm kiếm');
-      return;
+  const handleSaveApp = (values) => {
+    if (editingApp) {
+      setApplications(applications.map(a => a.id === editingApp.id ? { ...a, ...values } : a));
+    } else {
+      setApplications([...applications, { ...values, id: Date.now(), status: 'Pending', note: '' }]);
     }
+    setIsAppModalOpen(false);
+    appForm.resetFields();
+  };
 
-    const results = diplomas.filter(dip => {
-      let match = true;
-      if (values.diplomaNumber && dip.diplomaNumber !== values.diplomaNumber) match = false;
-      if (values.entryNumber && dip.entryNumber !== Number(values.entryNumber)) match = false;
-      if (values.studentId && dip.studentId !== values.studentId) match = false;
-      if (values.name && !dip.name.toLowerCase().includes(values.name.toLowerCase())) match = false;
-      if (values.dob && dip.dob !== values.dob.format('YYYY-MM-DD')) match = false;
-      return match;
-    });
+  const handleDeleteApp = (id) => {
+    setApplications(applications.filter(a => a.id !== id));
+  };
 
-    if (results.length > 0) {
-      const updatedDecisions = [...decisions];
-      results.forEach(res => {
-        const dIndex = updatedDecisions.findIndex(d => d.id === res.decisionId);
-        if (dIndex > -1) {
-          updatedDecisions[dIndex].lookupCount += 1;
-        }
-      });
-      setDecisions(updatedDecisions);
+  const logHistory = (action, ids, reason = '') => {
+    const time = moment().format('HH:mm DD/MM/YYYY');
+    const newLogs = ids.map(id => ({
+      id: Date.now() + Math.random(),
+      appId: id,
+      log: `Admin đã ${action} vào lúc ${time}${reason ? ` với lý do: ${reason}` : ''}`
+    }));
+    setHistory([...history, ...newLogs]);
+  };
+
+  const handleApprove = (ids) => {
+    setApplications(applications.map(a => ids.includes(a.id) ? { ...a, status: 'Approved' } : a));
+    logHistory('Approved', ids);
+    setSelectedAppKeys([]);
+  };
+
+  const handleRejectSubmit = (values) => {
+    setApplications(applications.map(a => rejectingIds.includes(a.id) ? { ...a, status: 'Rejected', note: values.reason } : a));
+    logHistory('Rejected', rejectingIds, values.reason);
+    setIsRejectModalOpen(false);
+    rejectForm.resetFields();
+    setSelectedAppKeys([]);
+  };
+
+  const handleChangeClubSubmit = (values) => {
+    setApplications(applications.map(a => selectedMemberKeys.includes(a.id) ? { ...a, clubId: values.newClubId } : a));
+    setIsChangeClubModalOpen(false);
+    changeClubForm.resetFields();
+    setSelectedMemberKeys([]);
+  };
+
+  const clubColumns = [
+    { title: 'Ảnh đại diện', dataIndex: 'avatar', render: t => <img src={t} alt="avatar" style={{width: 50, height: 50}} /> },
+    { title: 'Tên CLB', dataIndex: 'name', sorter: (a, b) => a.name.localeCompare(b.name) },
+    { title: 'Ngày thành lập', dataIndex: 'date', sorter: (a, b) => moment(a.date).unix() - moment(b.date).unix() },
+    { title: 'Mô tả', dataIndex: 'description', render: t => <div dangerouslySetInnerHTML={{ __html: t }} /> },
+    { title: 'Chủ nhiệm', dataIndex: 'president' },
+    { title: 'Hoạt động', dataIndex: 'active', render: t => t ? 'Có' : 'Không' },
+    {
+      title: 'Thao tác',
+      render: (_, record) => (
+        <Space>
+          <Button onClick={() => { setEditingClub(record); clubForm.setFieldsValue({ ...record, date: moment(record.date) }); setIsClubModalOpen(true); }}>Sửa</Button>
+          <Popconfirm title="Xóa CLB?" onConfirm={() => handleDeleteClub(record.id)}><Button danger>Xóa</Button></Popconfirm>
+          <Button onClick={() => { setActiveTab('3'); setSelectedMemberKeys([]); }}>Xem TV</Button>
+        </Space>
+      )
     }
+  ];
 
-    setSearchResults(results);
+  const appColumns = [
+    { title: 'Họ tên', dataIndex: 'name' },
+    { title: 'Email', dataIndex: 'email' },
+    { title: 'SĐT', dataIndex: 'phone' },
+    { title: 'Giới tính', dataIndex: 'gender' },
+    { title: 'CLB', dataIndex: 'clubId', render: id => clubs.find(c => c.id === id)?.name },
+    { title: 'Trạng thái', dataIndex: 'status' },
+    { title: 'Ghi chú', dataIndex: 'note' },
+    {
+      title: 'Thao tác',
+      render: (_, record) => (
+        <Space>
+          <Button onClick={() => { setEditingApp(record); appForm.setFieldsValue(record); setIsAppModalOpen(true); }}>Sửa</Button>
+          <Popconfirm title="Xóa?" onConfirm={() => handleDeleteApp(record.id)}><Button danger>Xóa</Button></Popconfirm>
+          {record.status === 'Pending' && (
+            <>
+              <Button type="primary" onClick={() => handleApprove([record.id])}>Duyệt</Button>
+              <Button danger onClick={() => { setRejectingIds([record.id]); setIsRejectModalOpen(true); }}>Từ chối</Button>
+            </>
+          )}
+        </Space>
+      )
+    }
+  ];
+
+  const chartData = clubs.flatMap(club => ['Pending', 'Approved', 'Rejected'].map(status => ({
+    club: club.name,
+    status,
+    count: applications.filter(a => a.clubId === club.id && a.status === status).length
+  })));
+
+  const chartConfig = {
+    data: chartData,
+    isGroup: true,
+    xField: 'club',
+    yField: 'count',
+    seriesField: 'status',
   };
 
   return (
     <div style={{ padding: 24 }}>
-      <Tabs defaultActiveKey="1">
-        <TabPane tab="Quản lý sổ văn bằng" key="1">
-          <Form form={bookForm} onFinish={onAddBook} layout="inline" style={{ marginBottom: 16 }}>
-            <Form.Item name="year" label="Năm" rules={[rules.required[0], rules.sotaikhoan[0]]}>
-              <Input />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit">Thêm sổ mới</Button>
-            </Form.Item>
-          </Form>
+      <Tabs activeKey={activeTab} onChange={setActiveTab}>
+        <TabPane tab="Danh sách CLB" key="1">
+          <Button type="primary" onClick={() => { setEditingClub(null); clubForm.resetFields(); setIsClubModalOpen(true); }} style={{ marginBottom: 16 }}>Thêm CLB</Button>
+          <Table dataSource={clubs} columns={clubColumns} rowKey="id" />
+        </TabPane>
+
+        <TabPane tab="Quản lý đơn đăng ký" key="2">
+          <Space style={{ marginBottom: 16 }}>
+            <Button type="primary" onClick={() => { setEditingApp(null); appForm.resetFields(); setIsAppModalOpen(true); }}>Thêm đơn</Button>
+            {selectedAppKeys.length > 0 && (
+              <>
+                <Button type="primary" onClick={() => handleApprove(selectedAppKeys)}>Duyệt {selectedAppKeys.length} đơn</Button>
+                <Button danger onClick={() => { setRejectingIds(selectedAppKeys); setIsRejectModalOpen(true); }}>Từ chối {selectedAppKeys.length} đơn</Button>
+              </>
+            )}
+            <Button onClick={() => setIsHistoryModalOpen(true)}>Xem lịch sử</Button>
+          </Space>
           <Table 
-            dataSource={books} 
+            rowSelection={{ selectedRowKeys: selectedAppKeys, onChange: setSelectedAppKeys }} 
+            dataSource={applications} 
+            columns={appColumns} 
             rowKey="id" 
-            columns={[
-              { title: 'Năm', dataIndex: 'year' },
-              { title: 'Số vào sổ hiện tại', dataIndex: 'currentEntry' }
-            ]} 
           />
         </TabPane>
 
-        <TabPane tab="Quyết định tốt nghiệp" key="2">
-          <Form form={decisionForm} onFinish={onAddDecision} layout="vertical">
-            <Form.Item name="decisionNumber" label="Số QĐ" rules={rules.required}>
-              <Input />
-            </Form.Item>
-            <Form.Item name="date" label="Ngày ban hành" rules={rules.required}>
-              <DatePicker format="DD/MM/YYYY" />
-            </Form.Item>
-            <Form.Item name="summary" label="Trích yếu" rules={rules.required}>
-              <Input.TextArea />
-            </Form.Item>
-            <Form.Item name="bookId" label="Sổ văn bằng" rules={rules.required}>
-              <Select>
-                {books.map(b => <Option key={b.id} value={b.id}>{b.year}</Option>)}
-              </Select>
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit">Thêm quyết định</Button>
-            </Form.Item>
-          </Form>
+        <TabPane tab="Quản lý thành viên" key="3">
+          <Space style={{ marginBottom: 16 }}>
+            <Button disabled={selectedMemberKeys.length === 0} type="primary" onClick={() => setIsChangeClubModalOpen(true)}>
+              Đổi CLB cho {selectedMemberKeys.length} thành viên
+            </Button>
+          </Space>
           <Table 
-            dataSource={decisions} 
+            rowSelection={{ selectedRowKeys: selectedMemberKeys, onChange: setSelectedMemberKeys }} 
+            dataSource={applications.filter(a => a.status === 'Approved')} 
+            columns={appColumns.filter(c => c.title !== 'Trạng thái' && c.title !== 'Thao tác')} 
             rowKey="id" 
-            columns={[
-              { title: 'Số QĐ', dataIndex: 'decisionNumber' },
-              { title: 'Ngày ban hành', dataIndex: 'date' },
-              { title: 'Trích yếu', dataIndex: 'summary' },
-              { title: 'Sổ năm', render: (_, r) => books.find(b => b.id === r.bookId)?.year },
-              { title: 'Lượt tra cứu', dataIndex: 'lookupCount' }
-            ]} 
           />
         </TabPane>
 
-        <TabPane tab="Cấu hình biểu mẫu" key="3">
-          <Form form={fieldForm} onFinish={onAddField} layout="inline" style={{ marginBottom: 16 }}>
-            <Form.Item name="name" label="Tên trường" rules={rules.required}>
-              <Input />
-            </Form.Item>
-            <Form.Item name="type" label="Kiểu dữ liệu" rules={rules.required}>
-              <Select style={{ width: 120 }}>
-                <Option value="String">String</Option>
-                <Option value="Number">Number</Option>
-                <Option value="Date">Date</Option>
-              </Select>
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit">Thêm trường</Button>
-            </Form.Item>
-          </Form>
-          <Table 
-            dataSource={fields} 
-            rowKey="id" 
-            columns={[
-              { title: 'Tên trường', dataIndex: 'name' },
-              { title: 'Kiểu dữ liệu', dataIndex: 'type' },
-              { title: 'Thao tác', render: (_, r) => <Button danger onClick={() => onDeleteField(r.id)}>Xóa</Button> }
-            ]} 
-          />
-        </TabPane>
-
-        <TabPane tab="Thông tin văn bằng" key="4">
-          <Form form={diplomaForm} onFinish={onAddDiploma} layout="vertical">
-            <Form.Item name="decisionId" label="Quyết định tốt nghiệp" rules={rules.required}>
-              <Select>
-                {decisions.map(d => <Option key={d.id} value={d.id}>{d.decisionNumber} - {d.summary}</Option>)}
-              </Select>
-            </Form.Item>
-            <Form.Item name="entryNumber" label="Số vào sổ">
-              <Input disabled />
-            </Form.Item>
-            <Form.Item name="diplomaNumber" label="Số hiệu văn bằng" rules={rules.required}>
-              <Input />
-            </Form.Item>
-            <Form.Item name="studentId" label="Mã sinh viên" rules={rules.required}>
-              <Input />
-            </Form.Item>
-            <Form.Item name="name" label="Họ tên" rules={rules.ten}>
-              <Input />
-            </Form.Item>
-            <Form.Item name="dob" label="Ngày sinh" rules={rules.required}>
-              <DatePicker format="DD/MM/YYYY" />
-            </Form.Item>
-
-            {fields.map(f => (
-              <Form.Item key={f.id} name={['customData', f.id]} label={f.name} rules={rules.required}>
-                {f.type === 'String' && <Input />}
-                {f.type === 'Number' && <InputNumber style={{ width: '100%' }} />}
-                {f.type === 'Date' && <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />}
-              </Form.Item>
-            ))}
-
-            <Form.Item>
-              <Button type="primary" htmlType="submit">Thêm văn bằng</Button>
-            </Form.Item>
-          </Form>
-        </TabPane>
-
-        <TabPane tab="Tra cứu văn bằng" key="5">
-          <Form form={searchForm} onFinish={onSearch} layout="vertical">
-            <Space size="middle" wrap>
-              <Form.Item name="diplomaNumber" label="Số hiệu văn bằng"><Input /></Form.Item>
-              <Form.Item name="entryNumber" label="Số vào sổ"><InputNumber style={{ width: '100%' }}/></Form.Item>
-              <Form.Item name="studentId" label="Mã sinh viên"><Input /></Form.Item>
-              <Form.Item name="name" label="Họ tên"><Input /></Form.Item>
-              <Form.Item name="dob" label="Ngày sinh"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }}/></Form.Item>
-            </Space>
-            <Form.Item>
-              <Button type="primary" htmlType="submit">Tra cứu</Button>
-            </Form.Item>
-          </Form>
-
-          {searchResults.map(dip => {
-            const decision = decisions.find(d => d.id === dip.decisionId);
-            return (
-              <Card key={dip.id} style={{ marginTop: 16 }}>
-                <Descriptions title="Thông tin văn bằng" bordered column={2}>
-                  <Descriptions.Item label="Họ tên">{dip.name}</Descriptions.Item>
-                  <Descriptions.Item label="Mã SV">{dip.studentId}</Descriptions.Item>
-                  <Descriptions.Item label="Ngày sinh">{moment(dip.dob).format('DD/MM/YYYY')}</Descriptions.Item>
-                  <Descriptions.Item label="Số hiệu">{dip.diplomaNumber}</Descriptions.Item>
-                  <Descriptions.Item label="Số vào sổ">{dip.entryNumber}</Descriptions.Item>
-                  {fields.map(f => (
-                    <Descriptions.Item key={f.id} label={f.name}>
-                      {dip.customData[f.id]}
-                    </Descriptions.Item>
-                  ))}
-                </Descriptions>
-                {decision && (
-                  <Descriptions title="Quyết định tốt nghiệp" bordered column={2} style={{ marginTop: 16 }}>
-                    <Descriptions.Item label="Số QĐ">{decision.decisionNumber}</Descriptions.Item>
-                    <Descriptions.Item label="Ngày ban hành">{moment(decision.date).format('DD/MM/YYYY')}</Descriptions.Item>
-                    <Descriptions.Item label="Trích yếu" span={2}>{decision.summary}</Descriptions.Item>
-                  </Descriptions>
-                )}
-              </Card>
-            );
-          })}
+        <TabPane tab="Báo cáo & Thống kê" key="4">
+          <Row gutter={16} style={{ marginBottom: 24 }}>
+            <Col span={6}><Card><Statistic title="Số CLB" value={clubs.length} /></Card></Col>
+            <Col span={6}><Card><Statistic title="Pending" value={applications.filter(a => a.status === 'Pending').length} /></Card></Col>
+            <Col span={6}><Card><Statistic title="Approved" value={applications.filter(a => a.status === 'Approved').length} /></Card></Col>
+            <Col span={6}><Card><Statistic title="Rejected" value={applications.filter(a => a.status === 'Rejected').length} /></Card></Col>
+          </Row>
+          <Card title="Số đơn đăng ký theo CLB">
+            <Column {...chartConfig} />
+          </Card>
         </TabPane>
       </Tabs>
+
+      <Modal title={editingClub ? 'Sửa CLB' : 'Thêm CLB'} visible={isClubModalOpen} onCancel={() => setIsClubModalOpen(false)} onOk={() => clubForm.submit()}>
+        <Form form={clubForm} onFinish={handleSaveClub} layout="vertical">
+          <Form.Item name="avatar" label="Link Ảnh đại diện" rules={rules.httpLink}><Input /></Form.Item>
+          <Form.Item name="name" label="Tên CLB" rules={rules.ten}><Input /></Form.Item>
+          <Form.Item name="date" label="Ngày thành lập" rules={rules.required}><DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name="description" label="Mô tả (HTML)"><Input.TextArea /></Form.Item>
+          <Form.Item name="president" label="Chủ nhiệm" rules={rules.ten}><Input /></Form.Item>
+          <Form.Item name="active" label="Hoạt động" valuePropName="checked"><Switch /></Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal title={editingApp ? 'Sửa đơn' : 'Thêm đơn'} visible={isAppModalOpen} onCancel={() => setIsAppModalOpen(false)} onOk={() => appForm.submit()}>
+        <Form form={appForm} onFinish={handleSaveApp} layout="vertical">
+          <Form.Item name="name" label="Họ tên" rules={rules.ten}><Input /></Form.Item>
+          <Form.Item name="email" label="Email" rules={rules.email}><Input /></Form.Item>
+          <Form.Item name="phone" label="SĐT" rules={rules.soDienThoai}><Input /></Form.Item>
+          <Form.Item name="gender" label="Giới tính"><Select options={[{ value: 'Nam', label: 'Nam' }, { value: 'Nữ', label: 'Nữ' }]} /></Form.Item>
+          <Form.Item name="address" label="Địa chỉ"><Input /></Form.Item>
+          <Form.Item name="strengths" label="Sở trường"><Input /></Form.Item>
+          <Form.Item name="clubId" label="Câu lạc bộ" rules={rules.required}>
+            <Select options={clubs.map(c => ({ value: c.id, label: c.name }))} />
+          </Form.Item>
+          <Form.Item name="reason" label="Lý do đăng ký"><Input.TextArea /></Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal title="Lý do từ chối" visible={isRejectModalOpen} onCancel={() => setIsRejectModalOpen(false)} onOk={() => rejectForm.submit()}>
+        <Form form={rejectForm} onFinish={handleRejectSubmit} layout="vertical">
+          <Form.Item name="reason" label="Lý do" rules={rules.required}><Input.TextArea /></Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal title="Đổi CLB" visible={isChangeClubModalOpen} onCancel={() => setIsChangeClubModalOpen(false)} onOk={() => changeClubForm.submit()}>
+        <p>Đang đổi CLB cho {selectedMemberKeys.length} thành viên</p>
+        <Form form={changeClubForm} onFinish={handleChangeClubSubmit} layout="vertical">
+          <Form.Item name="newClubId" label="Chọn CLB mới" rules={rules.required}>
+            <Select options={clubs.map(c => ({ value: c.id, label: c.name }))} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal title="Lịch sử thao tác" visible={isHistoryModalOpen} onCancel={() => setIsHistoryModalOpen(false)} footer={null}>
+        <Table dataSource={history} columns={[{ title: 'Chi tiết', dataIndex: 'log' }]} rowKey="id" pagination={false} />
+      </Modal>
     </div>
   );
-};
-
-export default App;
+}
