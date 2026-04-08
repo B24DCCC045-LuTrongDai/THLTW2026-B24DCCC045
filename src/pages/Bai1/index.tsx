@@ -1,249 +1,281 @@
-import React, { useState } from 'react';
-import { Table, Button, Modal, Form, Input, Select, DatePicker, Switch, Tabs, Space, Popconfirm, Card, Row, Col, Statistic, message } from 'antd';
-import { Column } from '@ant-design/charts';
-import moment from 'moment';
+import React, { useState, useMemo } from 'react';
+import { Tabs, Card, Row, Col, Select, Rate, Button, List, Form, Input, InputNumber, Upload, Table, Alert, Statistic, Modal, Progress } from 'antd';
+import { UploadOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import rules from '@/utils/rules';
 
-const { TabPane } = Tabs;
+const initialDestinations = [
+  { id: 1, name: 'Vịnh Hạ Long', type: 'biển', image: 'https://cdn-media.sforum.vn/storage/app/media/anh-vinh-ha-long-45.jpg', rating: 5, desc: 'Kỳ quan thế giới', time: 4, food: 1000000, stay: 1500000, transport: 500000 },
+  { id: 2, name: 'Sapa', type: 'núi', image: 'https://images.ctfassets.net/bth3mlrehms2/7FcLwVhbiIEnclUtcPl3Ua/15d6b769c12d2fbdafc43c4b3f9f6c21/Vietnam__Sapa__Reisterrassaen_und_Fluss.jpg?w=2122&h=1193&fl=progressive&q=50&fm=jpg', rating: 4, desc: 'Thành phố sương mù', time: 6, food: 800000, stay: 1200000, transport: 800000 },
+  { id: 3, name: 'Đà Nẵng', type: 'thành phố', image: 'https://cdn3.ivivu.com/2022/09/c%E1%BA%A7u-r%E1%BB%93ng-%C4%91%C3%A0-n%E1%BA%B5ng-ivivu-4.jpg', rating: 5, desc: 'Thành phố đáng sống', time: 5, food: 1200000, stay: 2000000, transport: 600000 }
+];
 
-export default function ClubManagement() {
-  const [clubs, setClubs] = useState([]);
-  const [applications, setApplications] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [activeTab, setActiveTab] = useState('1');
+const Home = ({ destinations }) => {
+  const [filterType, setFilterType] = useState('all');
+  const [sortPrice, setSortPrice] = useState('asc');
 
-  const [clubForm] = Form.useForm();
-  const [appForm] = Form.useForm();
-  const [rejectForm] = Form.useForm();
-  const [changeClubForm] = Form.useForm();
-
-  const [isClubModalOpen, setIsClubModalOpen] = useState(false);
-  const [isAppModalOpen, setIsAppModalOpen] = useState(false);
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [isChangeClubModalOpen, setIsChangeClubModalOpen] = useState(false);
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-
-  const [editingClub, setEditingClub] = useState(null);
-  const [editingApp, setEditingApp] = useState(null);
-  const [selectedAppKeys, setSelectedAppKeys] = useState([]);
-  const [selectedMemberKeys, setSelectedMemberKeys] = useState([]);
-  const [rejectingIds, setRejectingIds] = useState([]);
-
-  const handleSaveClub = (values) => {
-    if (editingClub) {
-      setClubs(clubs.map(c => c.id === editingClub.id ? { ...c, ...values, date: values.date.format('YYYY-MM-DD') } : c));
-    } else {
-      setClubs([...clubs, { ...values, id: Date.now(), date: values.date.format('YYYY-MM-DD') }]);
-    }
-    setIsClubModalOpen(false);
-    clubForm.resetFields();
-  };
-
-  const handleDeleteClub = (id) => {
-    setClubs(clubs.filter(c => c.id !== id));
-  };
-
-  const handleSaveApp = (values) => {
-    if (editingApp) {
-      setApplications(applications.map(a => a.id === editingApp.id ? { ...a, ...values } : a));
-    } else {
-      setApplications([...applications, { ...values, id: Date.now(), status: 'Pending', note: '' }]);
-    }
-    setIsAppModalOpen(false);
-    appForm.resetFields();
-  };
-
-  const handleDeleteApp = (id) => {
-    setApplications(applications.filter(a => a.id !== id));
-  };
-
-  const logHistory = (action, ids, reason = '') => {
-    const time = moment().format('HH:mm DD/MM/YYYY');
-    const newLogs = ids.map(id => ({
-      id: Date.now() + Math.random(),
-      appId: id,
-      log: `Admin đã ${action} vào lúc ${time}${reason ? ` với lý do: ${reason}` : ''}`
-    }));
-    setHistory([...history, ...newLogs]);
-  };
-
-  const handleApprove = (ids) => {
-    setApplications(applications.map(a => ids.includes(a.id) ? { ...a, status: 'Approved' } : a));
-    logHistory('Approved', ids);
-    setSelectedAppKeys([]);
-  };
-
-  const handleRejectSubmit = (values) => {
-    setApplications(applications.map(a => rejectingIds.includes(a.id) ? { ...a, status: 'Rejected', note: values.reason } : a));
-    logHistory('Rejected', rejectingIds, values.reason);
-    setIsRejectModalOpen(false);
-    rejectForm.resetFields();
-    setSelectedAppKeys([]);
-  };
-
-  const handleChangeClubSubmit = (values) => {
-    setApplications(applications.map(a => selectedMemberKeys.includes(a.id) ? { ...a, clubId: values.newClubId } : a));
-    setIsChangeClubModalOpen(false);
-    changeClubForm.resetFields();
-    setSelectedMemberKeys([]);
-  };
-
-  const clubColumns = [
-    { title: 'Ảnh đại diện', dataIndex: 'avatar', render: t => <img src={t} alt="avatar" style={{width: 50, height: 50}} /> },
-    { title: 'Tên CLB', dataIndex: 'name', sorter: (a, b) => a.name.localeCompare(b.name) },
-    { title: 'Ngày thành lập', dataIndex: 'date', sorter: (a, b) => moment(a.date).unix() - moment(b.date).unix() },
-    { title: 'Mô tả', dataIndex: 'description', render: t => <div dangerouslySetInnerHTML={{ __html: t }} /> },
-    { title: 'Chủ nhiệm', dataIndex: 'president' },
-    { title: 'Hoạt động', dataIndex: 'active', render: t => t ? 'Có' : 'Không' },
-    {
-      title: 'Thao tác',
-      render: (_, record) => (
-        <Space>
-          <Button onClick={() => { setEditingClub(record); clubForm.setFieldsValue({ ...record, date: moment(record.date) }); setIsClubModalOpen(true); }}>Sửa</Button>
-          <Popconfirm title="Xóa CLB?" onConfirm={() => handleDeleteClub(record.id)}><Button danger>Xóa</Button></Popconfirm>
-          <Button onClick={() => { setActiveTab('3'); setSelectedMemberKeys([]); }}>Xem TV</Button>
-        </Space>
-      )
-    }
-  ];
-
-  const appColumns = [
-    { title: 'Họ tên', dataIndex: 'name' },
-    { title: 'Email', dataIndex: 'email' },
-    { title: 'SĐT', dataIndex: 'phone' },
-    { title: 'Giới tính', dataIndex: 'gender' },
-    { title: 'CLB', dataIndex: 'clubId', render: id => clubs.find(c => c.id === id)?.name },
-    { title: 'Trạng thái', dataIndex: 'status' },
-    { title: 'Ghi chú', dataIndex: 'note' },
-    {
-      title: 'Thao tác',
-      render: (_, record) => (
-        <Space>
-          <Button onClick={() => { setEditingApp(record); appForm.setFieldsValue(record); setIsAppModalOpen(true); }}>Sửa</Button>
-          <Popconfirm title="Xóa?" onConfirm={() => handleDeleteApp(record.id)}><Button danger>Xóa</Button></Popconfirm>
-          {record.status === 'Pending' && (
-            <>
-              <Button type="primary" onClick={() => handleApprove([record.id])}>Duyệt</Button>
-              <Button danger onClick={() => { setRejectingIds([record.id]); setIsRejectModalOpen(true); }}>Từ chối</Button>
-            </>
-          )}
-        </Space>
-      )
-    }
-  ];
-
-  const chartData = clubs.flatMap(club => ['Pending', 'Approved', 'Rejected'].map(status => ({
-    club: club.name,
-    status,
-    count: applications.filter(a => a.clubId === club.id && a.status === status).length
-  })));
-
-  const chartConfig = {
-    data: chartData,
-    isGroup: true,
-    xField: 'club',
-    yField: 'count',
-    seriesField: 'status',
-  };
+  const filteredData = useMemo(() => {
+    let data = filterType === 'all' ? [...destinations] : destinations.filter(d => d.type === filterType);
+    return data.sort((a, b) => {
+      const priceA = a.food + a.stay + a.transport;
+      const priceB = b.food + b.stay + b.transport;
+      return sortPrice === 'asc' ? priceA - priceB : priceB - priceA;
+    });
+  }, [destinations, filterType, sortPrice]);
 
   return (
-    <div style={{ padding: 24 }}>
-      <Tabs activeKey={activeTab} onChange={setActiveTab}>
-        <TabPane tab="Danh sách CLB" key="1">
-          <Button type="primary" onClick={() => { setEditingClub(null); clubForm.resetFields(); setIsClubModalOpen(true); }} style={{ marginBottom: 16 }}>Thêm CLB</Button>
-          <Table dataSource={clubs} columns={clubColumns} rowKey="id" />
-        </TabPane>
+    <div>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} sm={12}>
+          <Select value={filterType} onChange={setFilterType} style={{ width: '100%' }}>
+            <Select.Option value="all">Tất cả loại hình</Select.Option>
+            <Select.Option value="biển">Biển</Select.Option>
+            <Select.Option value="núi">Núi</Select.Option>
+            <Select.Option value="thành phố">Thành phố</Select.Option>
+          </Select>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Select value={sortPrice} onChange={setSortPrice} style={{ width: '100%' }}>
+            <Select.Option value="asc">Giá tăng dần</Select.Option>
+            <Select.Option value="desc">Giá giảm dần</Select.Option>
+          </Select>
+        </Col>
+      </Row>
+      <Row gutter={[16, 16]}>
+        {filteredData.map(item => (
+          <Col xs={24} sm={12} md={8} key={item.id}>
+            <Card 
+              hoverable 
+              cover={
+                <img 
+                  alt={item.name} 
+                  src={item.image} 
+                  style={{ height: 200, objectFit: 'cover' }}
+                  onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/300x200.png?text=Lỗi+Ảnh'; }} 
+                />
+              }
+            >
+              <Card.Meta title={item.name} description={item.desc} />
+              <div style={{ marginTop: 10 }}>
+                <Rate disabled defaultValue={item.rating} />
+                <p>Tổng chi phí: {(item.food + item.stay + item.transport).toLocaleString()} VND</p>
+              </div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+    </div>
+  );
+};
 
-        <TabPane tab="Quản lý đơn đăng ký" key="2">
-          <Space style={{ marginBottom: 16 }}>
-            <Button type="primary" onClick={() => { setEditingApp(null); appForm.resetFields(); setIsAppModalOpen(true); }}>Thêm đơn</Button>
-            {selectedAppKeys.length > 0 && (
-              <>
-                <Button type="primary" onClick={() => handleApprove(selectedAppKeys)}>Duyệt {selectedAppKeys.length} đơn</Button>
-                <Button danger onClick={() => { setRejectingIds(selectedAppKeys); setIsRejectModalOpen(true); }}>Từ chối {selectedAppKeys.length} đơn</Button>
-              </>
-            )}
-            <Button onClick={() => setIsHistoryModalOpen(true)}>Xem lịch sử</Button>
-          </Space>
-          <Table 
-            rowSelection={{ selectedRowKeys: selectedAppKeys, onChange: setSelectedAppKeys }} 
-            dataSource={applications} 
-            columns={appColumns} 
-            rowKey="id" 
-          />
-        </TabPane>
+const Planner = ({ destinations, itinerary, setItinerary }) => {
+  const [selectedDest, setSelectedDest] = useState(null);
+  const [day, setDay] = useState(1);
 
-        <TabPane tab="Quản lý thành viên" key="3">
-          <Space style={{ marginBottom: 16 }}>
-            <Button disabled={selectedMemberKeys.length === 0} type="primary" onClick={() => setIsChangeClubModalOpen(true)}>
-              Đổi CLB cho {selectedMemberKeys.length} thành viên
-            </Button>
-          </Space>
-          <Table 
-            rowSelection={{ selectedRowKeys: selectedMemberKeys, onChange: setSelectedMemberKeys }} 
-            dataSource={applications.filter(a => a.status === 'Approved')} 
-            columns={appColumns.filter(c => c.title !== 'Trạng thái' && c.title !== 'Thao tác')} 
-            rowKey="id" 
-          />
-        </TabPane>
+  const addDestination = () => {
+    if (!selectedDest) return;
+    const dest = destinations.find(d => d.id === selectedDest);
+    setItinerary([...itinerary, { ...dest, itId: Date.now(), day }]);
+  };
 
-        <TabPane tab="Báo cáo & Thống kê" key="4">
-          <Row gutter={16} style={{ marginBottom: 24 }}>
-            <Col span={6}><Card><Statistic title="Số CLB" value={clubs.length} /></Card></Col>
-            <Col span={6}><Card><Statistic title="Pending" value={applications.filter(a => a.status === 'Pending').length} /></Card></Col>
-            <Col span={6}><Card><Statistic title="Approved" value={applications.filter(a => a.status === 'Approved').length} /></Card></Col>
-            <Col span={6}><Card><Statistic title="Rejected" value={applications.filter(a => a.status === 'Rejected').length} /></Card></Col>
-          </Row>
-          <Card title="Số đơn đăng ký theo CLB">
-            <Column {...chartConfig} />
+  const removeDestination = (itId) => {
+    setItinerary(itinerary.filter(i => i.itId !== itId));
+  };
+
+  const move = (index, direction) => {
+    const newIt = [...itinerary];
+    if (direction === 'up' && index > 0) {
+      [newIt[index - 1], newIt[index]] = [newIt[index], newIt[index - 1]];
+    } else if (direction === 'down' && index < newIt.length - 1) {
+      [newIt[index + 1], newIt[index]] = [newIt[index], newIt[index + 1]];
+    }
+    setItinerary(newIt);
+  };
+
+  const totalTime = itinerary.reduce((sum, item) => sum + item.time, 0);
+  const totalCost = itinerary.reduce((sum, item) => sum + item.food + item.stay + item.transport, 0);
+
+  return (
+    <Row gutter={[16, 16]}>
+      <Col xs={24} md={8}>
+        <Card title="Thêm điểm đến">
+          <Select style={{ width: '100%', marginBottom: 10 }} placeholder="Chọn điểm đến" onChange={setSelectedDest}>
+            {destinations.map(d => <Select.Option key={d.id} value={d.id}>{d.name}</Select.Option>)}
+          </Select>
+          <InputNumber min={1} value={day} onChange={setDay} style={{ width: '100%', marginBottom: 10 }} placeholder="Ngày thứ mấy" />
+          <Button type="primary" onClick={addDestination} block>Thêm vào lịch trình</Button>
+          <div style={{ marginTop: 20 }}>
+            <p>Tổng thời gian: {totalTime} giờ</p>
+            <p>Tổng ngân sách: {totalCost.toLocaleString()} VND</p>
+          </div>
+        </Card>
+      </Col>
+      <Col xs={24} md={16}>
+        <List
+          header={<div>Lịch trình chi tiết</div>}
+          bordered
+          dataSource={itinerary}
+          renderItem={(item, index) => (
+            <List.Item
+              actions={[
+                <Button icon={<ArrowUpOutlined />} onClick={() => move(index, 'up')} />,
+                <Button icon={<ArrowDownOutlined />} onClick={() => move(index, 'down')} />,
+                <Button danger onClick={() => removeDestination(item.itId)}>Xóa</Button>
+              ]}
+            >
+              <List.Item.Meta title={`Ngày ${item.day}: ${item.name}`} description={`${item.time} giờ - ${(item.food + item.stay + item.transport).toLocaleString()} VND`} />
+            </List.Item>
+          )}
+        />
+      </Col>
+    </Row>
+  );
+};
+
+const Budget = ({ itinerary }) => {
+  const [budgetLimit, setBudgetLimit] = useState(5000000);
+
+  let food = 0, stay = 0, transport = 0;
+  itinerary.forEach(item => {
+    food += item.food;
+    stay += item.stay;
+    transport += item.transport;
+  });
+
+  const totalCost = food + stay + transport;
+  const getPercent = (value) => totalCost === 0 ? 0 : Number(((value / totalCost) * 100).toFixed(1));
+
+  return (
+    <Row gutter={[16, 16]}>
+      <Col xs={24}>
+        <Card>
+          <InputNumber style={{ width: 200 }} value={budgetLimit} onChange={setBudgetLimit} addonBefore="Ngân sách tối đa" />
+          {totalCost > budgetLimit && (
+            <Alert message="Cảnh báo: Lịch trình hiện tại đã vượt quá ngân sách!" type="error" showIcon style={{ marginTop: 10 }} />
+          )}
+        </Card>
+      </Col>
+      <Col xs={24} md={12}>
+        <Card title="Phân bổ ngân sách (VNĐ)">
+          <div style={{ marginBottom: 10 }}>Ăn uống ({food.toLocaleString()}) <Progress percent={getPercent(food)} strokeColor="#1890ff" /></div>
+          <div style={{ marginBottom: 10 }}>Lưu trú ({stay.toLocaleString()}) <Progress percent={getPercent(stay)} strokeColor="#52c41a" /></div>
+          <div style={{ marginBottom: 10 }}>Di chuyển ({transport.toLocaleString()}) <Progress percent={getPercent(transport)} strokeColor="#faad14" /></div>
+        </Card>
+      </Col>
+    </Row>
+  );
+};
+
+const Admin = ({ destinations, setDestinations }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [form] = Form.useForm();
+
+  const handleFinish = (values) => {
+    let imageUrl = 'https://picsum.photos/300/200';
+    
+    // Lấy link ảnh thực tế mà người dùng tải lên thông qua URL.createObjectURL
+    if (values.upload && values.upload.length > 0) {
+      imageUrl = URL.createObjectURL(values.upload[0].originFileObj);
+    }
+
+    setDestinations([...destinations, { ...values, id: Date.now(), image: imageUrl }]);
+    setIsModalOpen(false);
+    form.resetFields();
+  };
+
+  const normFile = (e) => {
+    if (Array.isArray(e)) return e;
+    return e?.fileList;
+  };
+
+  const columns = [
+    { title: 'Tên', dataIndex: 'name', key: 'name' },
+    { title: 'Loại', dataIndex: 'type', key: 'type' },
+    { title: 'Đánh giá', dataIndex: 'rating', key: 'rating' },
+    { title: 'Hành động', key: 'action', render: (_, record) => <Button danger onClick={() => setDestinations(destinations.filter(d => d.id !== record.id))}>Xóa</Button> }
+  ];
+
+  const statsData = [
+    { month: 'Tháng 1', count: 120, revenue: 450000000 },
+    { month: 'Tháng 2', count: 150, revenue: 600000000 },
+    { month: 'Tháng 3', count: 180, revenue: 750000000 },
+  ];
+
+  return (
+    <div>
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+        <Col xs={24} sm={8}><Card><Statistic title="Lượt tạo lịch trình" value={180} /></Card></Col>
+        <Col xs={24} sm={8}><Card><Statistic title="Địa điểm phổ biến nhất" value="Vịnh Hạ Long" /></Card></Col>
+        <Col xs={24} sm={8}><Card><Statistic title="Tổng doanh thu (VND)" value={750000000} /></Card></Col>
+      </Row>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={12}>
+          <Card title="Thống kê lịch trình & doanh thu theo tháng">
+            <List
+              dataSource={statsData}
+              renderItem={item => (
+                <List.Item>
+                  <div style={{ width: '100%' }}>
+                    <div><strong>{item.month}</strong>: {item.count} lượt - Doanh thu: {item.revenue.toLocaleString()} VND</div>
+                    <Progress percent={Number(((item.revenue / 750000000) * 100).toFixed(1))} status="active" />
+                  </div>
+                </List.Item>
+              )}
+            />
           </Card>
-        </TabPane>
-      </Tabs>
+        </Col>
+        <Col xs={24} lg={12}>
+          <Card title="Quản lý điểm đến" extra={<Button type="primary" onClick={() => setIsModalOpen(true)}>Thêm mới</Button>}>
+            <Table dataSource={destinations} columns={columns} rowKey="id" scroll={{ x: 500 }} />
+          </Card>
+        </Col>
+      </Row>
 
-      <Modal title={editingClub ? 'Sửa CLB' : 'Thêm CLB'} visible={isClubModalOpen} onCancel={() => setIsClubModalOpen(false)} onOk={() => clubForm.submit()}>
-        <Form form={clubForm} onFinish={handleSaveClub} layout="vertical">
-          <Form.Item name="avatar" label="Link Ảnh đại diện" rules={rules.httpLink}><Input /></Form.Item>
-          <Form.Item name="name" label="Tên CLB" rules={rules.ten}><Input /></Form.Item>
-          <Form.Item name="date" label="Ngày thành lập" rules={rules.required}><DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} /></Form.Item>
-          <Form.Item name="description" label="Mô tả (HTML)"><Input.TextArea /></Form.Item>
-          <Form.Item name="president" label="Chủ nhiệm" rules={rules.ten}><Input /></Form.Item>
-          <Form.Item name="active" label="Hoạt động" valuePropName="checked"><Switch /></Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal title={editingApp ? 'Sửa đơn' : 'Thêm đơn'} visible={isAppModalOpen} onCancel={() => setIsAppModalOpen(false)} onOk={() => appForm.submit()}>
-        <Form form={appForm} onFinish={handleSaveApp} layout="vertical">
-          <Form.Item name="name" label="Họ tên" rules={rules.ten}><Input /></Form.Item>
-          <Form.Item name="email" label="Email" rules={rules.email}><Input /></Form.Item>
-          <Form.Item name="phone" label="SĐT" rules={rules.soDienThoai}><Input /></Form.Item>
-          <Form.Item name="gender" label="Giới tính"><Select options={[{ value: 'Nam', label: 'Nam' }, { value: 'Nữ', label: 'Nữ' }]} /></Form.Item>
-          <Form.Item name="address" label="Địa chỉ"><Input /></Form.Item>
-          <Form.Item name="strengths" label="Sở trường"><Input /></Form.Item>
-          <Form.Item name="clubId" label="Câu lạc bộ" rules={rules.required}>
-            <Select options={clubs.map(c => ({ value: c.id, label: c.name }))} />
-          </Form.Item>
-          <Form.Item name="reason" label="Lý do đăng ký"><Input.TextArea /></Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal title="Lý do từ chối" visible={isRejectModalOpen} onCancel={() => setIsRejectModalOpen(false)} onOk={() => rejectForm.submit()}>
-        <Form form={rejectForm} onFinish={handleRejectSubmit} layout="vertical">
-          <Form.Item name="reason" label="Lý do" rules={rules.required}><Input.TextArea /></Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal title="Đổi CLB" visible={isChangeClubModalOpen} onCancel={() => setIsChangeClubModalOpen(false)} onOk={() => changeClubForm.submit()}>
-        <p>Đang đổi CLB cho {selectedMemberKeys.length} thành viên</p>
-        <Form form={changeClubForm} onFinish={handleChangeClubSubmit} layout="vertical">
-          <Form.Item name="newClubId" label="Chọn CLB mới" rules={rules.required}>
-            <Select options={clubs.map(c => ({ value: c.id, label: c.name }))} />
+      <Modal title="Thêm điểm đến" visible={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()}>
+        <Form form={form} layout="vertical" onFinish={handleFinish}>
+          <Form.Item name="name" label="Tên địa điểm" rules={rules.ten}><Input /></Form.Item>
+          <Form.Item name="type" label="Loại hình" rules={rules.required}><Select><Select.Option value="biển">Biển</Select.Option><Select.Option value="núi">Núi</Select.Option><Select.Option value="thành phố">Thành phố</Select.Option></Select></Form.Item>
+          <Form.Item name="desc" label="Mô tả" rules={rules.text}><Input.TextArea /></Form.Item>
+          <Row gutter={16}>
+            <Col span={12}><Form.Item name="time" label="Thời gian tham quan (giờ)" rules={rules.float(24)}><InputNumber style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={12}><Form.Item name="rating" label="Đánh giá" rules={rules.float(5)}><InputNumber style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="food" label="Ăn uống" rules={rules.required}><InputNumber style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="stay" label="Lưu trú" rules={rules.required}><InputNumber style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="transport" label="Di chuyển" rules={rules.required}><InputNumber style={{ width: '100%' }} /></Form.Item></Col>
+          </Row>
+          <Form.Item name="upload" label="Hình ảnh" valuePropName="fileList" getValueFromEvent={normFile}>
+            <Upload beforeUpload={() => false} maxCount={1} accept="image/*">
+              <Button icon={<UploadOutlined />}>Chọn ảnh</Button>
+            </Upload>
           </Form.Item>
         </Form>
-      </Modal>
-
-      <Modal title="Lịch sử thao tác" visible={isHistoryModalOpen} onCancel={() => setIsHistoryModalOpen(false)} footer={null}>
-        <Table dataSource={history} columns={[{ title: 'Chi tiết', dataIndex: 'log' }]} rowKey="id" pagination={false} />
       </Modal>
     </div>
   );
-}
+};
+
+const TravelApp = () => {
+  const [destinations, setDestinations] = useState(initialDestinations);
+  const [itinerary, setItinerary] = useState([]);
+
+  return (
+    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <Tabs defaultActiveKey="1">
+        <Tabs.TabPane tab="Trang chủ" key="1">
+          <Home destinations={destinations} />
+        </Tabs.TabPane>
+        <Tabs.TabPane tab="Lên lịch trình" key="2">
+          <Planner destinations={destinations} itinerary={itinerary} setItinerary={setItinerary} />
+        </Tabs.TabPane>
+        <Tabs.TabPane tab="Ngân sách" key="3">
+          <Budget itinerary={itinerary} />
+        </Tabs.TabPane>
+        <Tabs.TabPane tab="Admin" key="4">
+          <Admin destinations={destinations} setDestinations={setDestinations} />
+        </Tabs.TabPane>
+      </Tabs>
+    </div>
+  );
+};
+
+export default TravelApp;
