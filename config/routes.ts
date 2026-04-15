@@ -33,10 +33,10 @@ export default [
 		hideInMenu: true,
 	},
 	{
-		path: '/bai-1',
-		name: 'Bai1',
+		path: '/bai-lam',
+		name: 'Bài Làm',
 		icon: 'AppstoreOutlined',
-		component: './Bai1',
+		component: './BaiLam',
 	},
 	
 	// DANH MUC HE THONG
