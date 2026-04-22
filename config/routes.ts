@@ -20,23 +20,40 @@ export default [
 
 	///////////////////////////////////
 	// DEFAULT MENU
-	{
-		path: '/dashboard',
-		name: 'Dashboard',
-		component: './TrangChu',
+{
+		path: '/home',
+		name: 'Trang chủ',
 		icon: 'HomeOutlined',
+		component: './Home',
 	},
 	{
-		path: '/gioi-thieu',
-		name: 'About',
-		component: './TienIch/GioiThieu',
+		path: '/post/:id',
+		name: 'Chi tiết bài viết',
+		component: './PostDetail',
 		hideInMenu: true,
 	},
 	{
-		path: '/bai-lam',
-		name: 'Bài Làm',
+		path: '/about',
+		name: 'Giới thiệu',
+		icon: 'UserOutlined',
+		component: './About',
+	},
+	{
+		path: '/admin',
+		name: 'Quản lý',
 		icon: 'AppstoreOutlined',
-		component: './BaiLam',
+		routes: [
+			{
+				path: '/admin/posts',
+				name: 'Quản lý bài viết',
+				component: './Admin/PostManagement',
+			},
+			{
+				path: '/admin/tags',
+				name: 'Quản lý thẻ',
+				component: './Admin/TagManagement',
+			},
+		],
 	},
 	
 	// DANH MUC HE THONG
